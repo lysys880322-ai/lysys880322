@@ -7,6 +7,23 @@
 # 병합 → 그대로 다시 전송" 순서를 지켜야 기존 정보(카테고리, 태그 등)가 사라지지 않는다.
 from typing import Optional
 
+from googleapiclient.errors import HttpError
+
+TITLE_MAX_LEN = 100
+# 유튜브 설명 제한은 5000바이트라, 한글처럼 1글자가 여러 바이트인 경우를 감안해 여유있게 자른다.
+DESCRIPTION_MAX_BYTES = 4800
+
+
+def _truncate_title(title: str) -> str:
+    return title if len(title) <= TITLE_MAX_LEN else title[: TITLE_MAX_LEN - 1] + "…"
+
+
+def _truncate_description(description: str) -> str:
+    encoded = description.encode("utf-8")
+    if len(encoded) <= DESCRIPTION_MAX_BYTES:
+        return description
+    return encoded[:DESCRIPTION_MAX_BYTES].decode("utf-8", errors="ignore")
+
 
 def get_uploads_playlist_id(youtube) -> str:
     resp = youtube.channels().list(part="contentDetails", mine=True).execute()
@@ -74,7 +91,17 @@ def upsert_localizations(
     (카테고리·태그 등)은 그대로 보존한 채로 videos.update를 호출한다."""
     current = get_video_full_details(youtube, video_id)
     full_snippet = current["snippet"]
-    merged_localizations = {**current["localizations"], **new_localizations}
+
+    # 번역된 제목/설명이 유튜브 제한(제목 100자, 설명 5000바이트)을 넘으면 요청 전체가
+    # "invalidVideoMetadata"로 거부되므로, 넘는 경우 안전하게 잘라서 보낸다.
+    safe_new_localizations = {
+        lang: {
+            "title": _truncate_title(loc.get("title", "")),
+            "description": _truncate_description(loc.get("description", "")),
+        }
+        for lang, loc in new_localizations.items()
+    }
+    merged_localizations = {**current["localizations"], **safe_new_localizations}
 
     # videos.list가 돌려주는 snippet에는 channelId/publishedAt/thumbnails/localized 같은
     # 읽기 전용 항목이 섞여 있는데, 그걸 그대로 videos.update에 다시 보내면 유튜브가
@@ -95,5 +122,12 @@ def upsert_localizations(
         snippet["defaultLanguage"] = set_default_language
 
     body = {"id": video_id, "snippet": snippet, "localizations": merged_localizations}
-    result = youtube.videos().update(part="snippet,localizations", body=body).execute()
+    try:
+        result = youtube.videos().update(part="snippet,localizations", body=body).execute()
+    except HttpError as e:
+        title_lengths = {lang: len(loc["title"]) for lang, loc in merged_localizations.items()}
+        raise RuntimeError(
+            f"{e}\n[디버그] categoryId={snippet.get('categoryId')!r}, "
+            f"defaultLanguage={snippet.get('defaultLanguage')!r}, 언어별 제목 길이={title_lengths}"
+        ) from e
     return result
