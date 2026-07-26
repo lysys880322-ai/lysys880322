@@ -46,6 +46,10 @@ def get_login_url() -> str:
         prompt="consent",
     )
     st.session_state["oauth_state"] = state
+    # PKCE 방식이라 로그인 링크를 만들 때 생긴 code_verifier를, 나중에 구글이 돌아왔을 때
+    # 토큰을 교환하는 단계에서도 그대로 써야 한다 — 그렇지 않으면 "Missing code verifier"
+    # 오류가 난다. Flow 객체는 매번 새로 만드므로 세션에 직접 저장해둔다.
+    st.session_state["oauth_code_verifier"] = flow.code_verifier
     return auth_url
 
 
@@ -58,6 +62,7 @@ def try_handle_redirect() -> bool:
         return False
 
     flow = _build_flow()
+    flow.code_verifier = st.session_state.get("oauth_code_verifier")
     try:
         flow.fetch_token(code=code)
     except Exception as e:  # noqa: BLE001
