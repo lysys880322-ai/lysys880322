@@ -73,8 +73,23 @@ def upsert_localizations(
     """선택한 언어의 번역만 추가/갱신하고, 이미 있던 다른 언어 번역과 원본 snippet 항목
     (카테고리·태그 등)은 그대로 보존한 채로 videos.update를 호출한다."""
     current = get_video_full_details(youtube, video_id)
-    snippet = dict(current["snippet"])
+    full_snippet = current["snippet"]
     merged_localizations = {**current["localizations"], **new_localizations}
+
+    # videos.list가 돌려주는 snippet에는 channelId/publishedAt/thumbnails/localized 같은
+    # 읽기 전용 항목이 섞여 있는데, 그걸 그대로 videos.update에 다시 보내면 유튜브가
+    # "invalidVideoMetadata"로 요청 전체를 거부한다. 실제로 수정 가능한 항목만 추려서 보낸다.
+    snippet = {
+        "title": full_snippet.get("title", ""),
+        "description": full_snippet.get("description", ""),
+        "categoryId": full_snippet.get("categoryId"),
+    }
+    if "tags" in full_snippet:
+        snippet["tags"] = full_snippet["tags"]
+    if full_snippet.get("defaultLanguage"):
+        snippet["defaultLanguage"] = full_snippet["defaultLanguage"]
+    if full_snippet.get("defaultAudioLanguage"):
+        snippet["defaultAudioLanguage"] = full_snippet["defaultAudioLanguage"]
 
     if set_default_language and not snippet.get("defaultLanguage"):
         snippet["defaultLanguage"] = set_default_language
