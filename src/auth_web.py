@@ -34,7 +34,18 @@ def _build_flow() -> Flow:
             "웹 배포용 Google OAuth 클라이언트(GOOGLE_WEB_CLIENT_ID/GOOGLE_WEB_CLIENT_SECRET)가 "
             "설정되어 있지 않습니다. Streamlit Cloud의 Secrets 설정을 확인하세요."
         )
-    return Flow.from_client_config(_client_config(), scopes=YOUTUBE_SCOPES, redirect_uri=APP_BASE_URL)
+    # autogenerate_code_verifier=False: PKCE의 code_verifier는 "로그인 링크를 만든
+    # 순간"과 "구글이 돌아온 뒤 토큰 교환하는 순간" 사이에 값이 그대로 보존돼야 하는데,
+    # 구글 로그인 화면으로 갔다가 돌아오는 건 브라우저가 완전히 새 페이지를 불러오는
+    # 방식이라 그 사이 st.session_state가 초기화돼 버려 값이 유지되지 않는다("Missing
+    # code verifier" 오류 원인). 이미 client_secret으로 인증하는 confidential 클라이언트라
+    # PKCE 자체가 필수는 아니므로, 아예 꺼서 이 문제를 피한다.
+    return Flow.from_client_config(
+        _client_config(),
+        scopes=YOUTUBE_SCOPES,
+        redirect_uri=APP_BASE_URL,
+        autogenerate_code_verifier=False,
+    )
 
 
 def get_login_url() -> str:
@@ -46,10 +57,6 @@ def get_login_url() -> str:
         prompt="consent",
     )
     st.session_state["oauth_state"] = state
-    # PKCE 방식이라 로그인 링크를 만들 때 생긴 code_verifier를, 나중에 구글이 돌아왔을 때
-    # 토큰을 교환하는 단계에서도 그대로 써야 한다 — 그렇지 않으면 "Missing code verifier"
-    # 오류가 난다. Flow 객체는 매번 새로 만드므로 세션에 직접 저장해둔다.
-    st.session_state["oauth_code_verifier"] = flow.code_verifier
     return auth_url
 
 
@@ -62,7 +69,6 @@ def try_handle_redirect() -> bool:
         return False
 
     flow = _build_flow()
-    flow.code_verifier = st.session_state.get("oauth_code_verifier")
     try:
         flow.fetch_token(code=code)
     except Exception as e:  # noqa: BLE001
