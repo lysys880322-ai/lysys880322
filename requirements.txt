@@ -1,0 +1,7 @@
+streamlit>=1.38
+google-api-python-client>=2.140
+google-auth-httplib2>=0.2
+google-auth-oauthlib>=1.2
+google-genai>=1.0
+python-dotenv>=1.0
+pandas>=2.2
