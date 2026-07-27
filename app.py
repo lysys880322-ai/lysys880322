@@ -17,7 +17,77 @@ if AUTH_MODE == "web":
 else:
     from src import auth
 
-st.set_page_config(page_title="ys-유튜브다국어 제목 설명 자동 번역 등록기!!", layout="wide")
+st.set_page_config(page_title="ys-유튜브다국어 제목 설명 자동 번역 등록기!!", layout="wide", page_icon="🌏")
+
+# ── 세련된 다크 테마 + 포인트 컬러 스타일 ─────────────────────
+st.markdown(
+    """
+    <style>
+    :root {
+        --accent1: #7C5CFF;
+        --accent2: #22D3EE;
+    }
+    .stApp {
+        background:
+            radial-gradient(1200px 600px at 8% -10%, rgba(124,92,255,0.16), transparent),
+            radial-gradient(1000px 500px at 100% 0%, rgba(34,211,238,0.12), transparent),
+            #0b0b12;
+    }
+    h1 {
+        font-weight: 800 !important;
+        letter-spacing: -0.5px;
+        background: linear-gradient(90deg, var(--accent2), var(--accent1));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        padding-bottom: 4px;
+    }
+    h2 {
+        font-weight: 700 !important;
+        border-left: 5px solid var(--accent1);
+        padding: 2px 0 2px 14px !important;
+        margin-top: 2.2rem !important;
+        color: #f1f1f6 !important;
+    }
+    div.stButton > button, .stLinkButton a {
+        border-radius: 10px !important;
+        border: 1px solid rgba(124,92,255,0.45) !important;
+        transition: all 0.15s ease;
+        font-weight: 600 !important;
+    }
+    div.stButton > button:hover {
+        border-color: var(--accent1) !important;
+        color: var(--accent1) !important;
+        transform: translateY(-1px);
+    }
+    div.stButton > button[kind="primary"], .stLinkButton a {
+        background: linear-gradient(90deg, var(--accent1), var(--accent2)) !important;
+        border: none !important;
+        color: white !important;
+        box-shadow: 0 4px 16px rgba(124,92,255,0.35);
+    }
+    div.stButton > button[kind="primary"]:hover, .stLinkButton a:hover {
+        filter: brightness(1.12);
+        color: white !important;
+    }
+    [data-testid="stAlert"] {
+        border-radius: 12px !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+    }
+    [data-testid="stDataFrame"], [data-testid="stDataEditor"] {
+        border-radius: 12px !important;
+        overflow: hidden;
+        border: 1px solid rgba(124,92,255,0.2) !important;
+    }
+    hr, [data-testid="stDivider"] {
+        border-color: rgba(124,92,255,0.3) !important;
+    }
+    [data-testid="stCheckbox"] label p {
+        font-weight: 500;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ── 배포용 비밀번호 게이트 — ACCESS_PASSWORD가 설정된 경우(배포 환경)에만 동작한다.
 # 내 PC에서 그냥 실행할 땐 이 값이 비어있어서 아래 블록 전체를 건너뛴다.
