@@ -51,6 +51,13 @@ TARGET_LANGUAGES = [
     ("id", "인도네시아어", "Indonesian"),
     ("de", "독일어", "German"),
     ("fr", "프랑스어", "French"),
+    ("vi", "베트남어", "Vietnamese"),
+    ("th", "태국어", "Thai"),
+    ("ru", "러시아어", "Russian"),
+    ("tr", "터키어", "Turkish"),
+    ("tl", "필리핀어", "Filipino"),
+    ("it", "이탈리아어", "Italian"),
+    ("ar", "아랍어", "Arabic"),
 ]
 
 LANGUAGE_NAME_BY_CODE = {code: name_ko for code, name_ko, _ in TARGET_LANGUAGES}
