@@ -233,8 +233,15 @@ with st.container(border=True):
         st.stop()
 
 # ── 3단계: 번역할 언어 선택 ──────────────────────────────────
+def _toggle_all_langs():
+    value = st.session_state.get("lang_select_all", False)
+    for code, _, _ in TARGET_LANGUAGES:
+        st.session_state[f"lang_{code}"] = value
+
+
 with st.container(border=True):
     section_header("3", "번역할 언어 선택")
+    st.checkbox("전체 선택", key="lang_select_all", on_change=_toggle_all_langs)
     lang_cols = st.columns(4)
     selected_langs = []
     for i, (code, name_ko, _) in enumerate(TARGET_LANGUAGES):
