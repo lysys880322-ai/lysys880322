@@ -17,23 +17,23 @@ if AUTH_MODE == "web":
 else:
     from src import auth
 
-st.set_page_config(page_title="ys-유튜브다국어 제목 설명 자동 번역 등록기!!", layout="wide", page_icon="☕")
+st.set_page_config(page_title="★-Lys-★유튜브 다국어 제목º설명 자동번역 등록기!!", layout="wide", page_icon="🌏")
 
 # ── 카페·음악 채널 감성의 따뜻한 다크 테마 + 포인트 컬러 ─────────
 st.markdown(
     """
     <style>
     :root {
-        --accent1: #E8A33D;
-        --accent2: #C1440E;
-        --card-bg: rgba(255, 255, 255, 0.035);
-        --card-border: rgba(232, 163, 61, 0.28);
+        --accent1: #7C5CFF;
+        --accent2: #22D3EE;
+        --card-bg: rgba(255, 255, 255, 0.03);
+        --card-border: rgba(124, 92, 255, 0.25);
     }
     .stApp {
         background:
-            radial-gradient(1200px 600px at 8% -10%, rgba(232, 163, 61, 0.18), transparent),
-            radial-gradient(1000px 550px at 100% 0%, rgba(193, 68, 14, 0.14), transparent),
-            #130d09;
+            radial-gradient(1200px 600px at 8% -10%, rgba(124, 92, 255, 0.12), transparent),
+            radial-gradient(1000px 550px at 100% 0%, rgba(34, 211, 238, 0.09), transparent),
+            #0b0b12;
     }
     h1 {
         font-weight: 800 !important;
@@ -62,10 +62,10 @@ st.markdown(
         min-width: 34px;
         border-radius: 50%;
         background: linear-gradient(135deg, var(--accent1), var(--accent2));
-        color: #1a1006;
+        color: white;
         font-weight: 800;
         font-size: 1rem;
-        box-shadow: 0 3px 10px rgba(193, 68, 14, 0.4);
+        box-shadow: 0 3px 10px rgba(124, 92, 255, 0.4);
     }
     /* 카드형 섹션(st.container(border=True)) 스타일 */
     [data-testid="stVerticalBlockBorderWrapper"] {
@@ -78,7 +78,7 @@ st.markdown(
     }
     div.stButton > button, .stLinkButton a {
         border-radius: 10px !important;
-        border: 1px solid rgba(232, 163, 61, 0.5) !important;
+        border: 1px solid rgba(124, 92, 255, 0.45) !important;
         transition: all 0.15s ease;
         font-weight: 600 !important;
     }
@@ -90,13 +90,13 @@ st.markdown(
     div.stButton > button[kind="primary"], .stLinkButton a {
         background: linear-gradient(90deg, var(--accent1), var(--accent2)) !important;
         border: none !important;
-        color: #1a1006 !important;
+        color: white !important;
         font-weight: 700 !important;
-        box-shadow: 0 4px 16px rgba(193, 68, 14, 0.4);
+        box-shadow: 0 4px 16px rgba(124, 92, 255, 0.35);
     }
     div.stButton > button[kind="primary"]:hover, .stLinkButton a:hover {
-        filter: brightness(1.1);
-        color: #1a1006 !important;
+        filter: brightness(1.12);
+        color: white !important;
     }
     [data-testid="stAlert"] {
         border-radius: 12px !important;
@@ -108,7 +108,7 @@ st.markdown(
         border: 1px solid var(--card-border) !important;
     }
     hr, [data-testid="stDivider"] {
-        border-color: rgba(232, 163, 61, 0.35) !important;
+        border-color: rgba(124, 92, 255, 0.3) !important;
     }
     [data-testid="stCheckbox"] label p {
         font-weight: 500;
@@ -139,7 +139,7 @@ if ACCESS_PASSWORD and not st.session_state.get("password_ok"):
             st.error("비밀번호가 틀렸습니다.")
     st.stop()
 
-st.title("☕ ys-유튜브다국어 제목 설명 자동 번역 등록기!!")
+st.title("🌏 ★-Lys-★유튜브 다국어 제목º설명 자동번역 등록기!!")
 
 # 웹 모드에서는 구글 로그인 후 이 주소(?code=...)로 돌아오므로, 매번 먼저 확인한다.
 if AUTH_MODE == "web":
