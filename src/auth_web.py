@@ -6,6 +6,7 @@
 # 여러 기기)이 같은 배포 주소에 각자 접속할 수 있어서, 한 파일을 공유하면 서로 로그인이
 # 섞여버리기 때문이다. 세션이 끝나면(브라우저 탭을 닫으면) 다시 로그인해야 한다.
 import json
+import os
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -14,6 +15,15 @@ from googleapiclient.discovery import build
 import streamlit as st
 
 from src.config import APP_BASE_URL, GOOGLE_WEB_CLIENT_ID, GOOGLE_WEB_CLIENT_SECRET, YOUTUBE_SCOPES
+
+# 버그 수정(2026-08): get_login_url()이 include_granted_scopes="true"로 로그인 링크를 만드는데,
+# 이 계정이 예전에(다른 앱이나 이전 로그인에서) youtube.readonly/youtube.upload까지 이미
+# 승인해준 적이 있으면, 구글이 우리가 요청한 "youtube" 한 개보다 더 넓은 스코프 3개를 그대로
+# 돌려준다. google-auth-oauthlib은 기본적으로 "요청한 스코프 ≠ 실제로 받은 스코프"면
+# "Scope has changed..." 경고를 예외로 띄워서 로그인 자체가 막힌다. OAUTHLIB_RELAX_TOKEN_SCOPE를
+# 켜면 이 엄격한 일치 검사를 꺼서, 넓혀진 스코프를 그대로 받아들이고 로그인을 계속 진행한다
+# (실제 요청 스코프 자체는 안 바뀜 — 검증만 완화하는 표준적인 방법).
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 
 def _client_config() -> dict:

@@ -1,6 +1,7 @@
 # Google OAuth 2.0 로그인 — 최초 1회만 브라우저 로그인 창이 뜨고, 이후에는 token.json에
 # 저장된 refresh token으로 자동 재로그인된다. client_secret.json/token.json 둘 다
 # .gitignore에 등록되어 있어 실수로 커밋될 일이 없다.
+import os
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -9,6 +10,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from src.config import GOOGLE_CLIENT_SECRETS_FILE, TOKEN_FILE, YOUTUBE_SCOPES
+
+# 버그 수정(2026-08) — 웹 로그인(auth_web.py)과 같은 이유의 "Scope has changed" 문제를 여기서도
+# 겪을 수 있어 똑같이 완화한다(계정이 예전에 더 넓은 스코프를 승인해준 적이 있는 경우).
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 
 def _client_secrets_path() -> Path:
