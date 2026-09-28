@@ -207,7 +207,24 @@ with st.container(border=True):
     with col1:
         if st.button("영상 목록 불러오기 / 새로고침"):
             with st.spinner("내 채널 영상 목록을 불러오는 중..."):
-                st.session_state.videos = youtube_api.list_my_videos(youtube)
+                try:
+                    channel_info = youtube.channels().list(part="snippet,contentDetails", mine=True).execute()
+                    st.session_state.videos = youtube_api.list_my_videos(youtube)
+                    items = channel_info.get("items", [])
+                    if items:
+                        ch_title = items[0]["snippet"]["title"]
+                        st.session_state.last_fetch_msg = (
+                            f"✅ 채널 \"{ch_title}\"에서 영상 {len(st.session_state.videos)}개를 찾았습니다."
+                        )
+                    else:
+                        st.session_state.last_fetch_msg = "⚠️ 이 계정에 연결된 유튜브 채널 정보를 아예 못 찾았습니다."
+                except Exception as e:  # noqa: BLE001
+                    st.session_state.last_fetch_msg = f"❌ 영상 목록을 불러오다 오류가 났습니다: {e}"
+
+    # "버튼을 아직 안 눌렀을 때"와 "눌렀는데 0개 찾았을 때"가 화면에 똑같이 보여서 "반응이
+    # 없다"고 느껴진다는 문제(2026-09) — 몇 개를 찾았는지(0개 포함) 항상 명확히 보여준다.
+    if "last_fetch_msg" in st.session_state:
+        st.write(st.session_state.last_fetch_msg)
 
     if not st.session_state.videos:
         st.info("위 '영상 목록 불러오기' 버튼을 눌러주세요.")
