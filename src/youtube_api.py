@@ -5,6 +5,7 @@
 # videos.update는 part에 넣은 최상위 리소스(snippet 등)를 요청 본문 내용으로 통째로
 # 대체하는 API라서, 반드시 "최신 snippet+localizations를 먼저 조회 → 필요한 부분만 바꿔
 # 병합 → 그대로 다시 전송" 순서를 지켜야 기존 정보(카테고리, 태그 등)가 사라지지 않는다.
+import re
 from typing import Optional
 
 from googleapiclient.errors import HttpError
@@ -25,6 +26,38 @@ def _truncate_description(description: str) -> str:
     return encoded[:DESCRIPTION_MAX_BYTES].decode("utf-8", errors="ignore")
 
 
+_VIDEO_ID_RE = re.compile(r"(?:v=|youtu\.be/|shorts/|embed/)([A-Za-z0-9_-]{11})")
+
+
+def extract_video_id(text: str) -> Optional[str]:
+    """유튜브 영상 링크(여러 형태) 또는 11자리 영상 ID 그 자체에서 영상 ID만 뽑아낸다.
+    "채널 목록 자동 불러오기"가 계정 문제로 안 될 때, 영상 링크·ID를 직접 붙여넣어 우회하는
+    기능(2026-09)에서 쓴다. 못 알아보면 None."""
+    if not text:
+        return None
+    text = text.strip()
+    m = _VIDEO_ID_RE.search(text)
+    if m:
+        return m.group(1)
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", text):
+        return text
+    return None
+
+
+def get_channel_id_by_handle(youtube, handle: str) -> str:
+    """@핸들(또는 채널 URL에서 뽑은 핸들)로 채널 고유 ID를 찾는다. "mine=True"(로그인
+    세션이 어느 채널로 인증됐는지)와 달리, 이건 항상 그 핸들이 가리키는 정확한 채널을
+    가리켜서 로그인 계정의 "활성 채널" 혼선과 무관하게 동작한다(2026-09, mine=True가
+    엉뚱한 빈 채널로 붙는 문제의 우회책). 공개 채널 정보 조회라 로그인 없이도 되지만,
+    비공개(미공개) 영상까지 보려면 그 채널 관리 권한이 있는 계정으로 로그인은 돼있어야 한다."""
+    handle = handle.strip().lstrip("@")
+    resp = youtube.channels().list(part="contentDetails,snippet", forHandle=f"@{handle}").execute()
+    items = resp.get("items", [])
+    if not items:
+        raise RuntimeError(f"'@{handle}' 핸들의 채널을 찾을 수 없습니다. 핸들 철자를 확인해주세요.")
+    return items[0]
+
+
 def get_uploads_playlist_id(youtube) -> str:
     resp = youtube.channels().list(part="contentDetails", mine=True).execute()
     items = resp.get("items", [])
@@ -33,9 +66,7 @@ def get_uploads_playlist_id(youtube) -> str:
     return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
 
-def list_my_videos(youtube, max_total: int = 200) -> list[dict]:
-    """내 채널에 올라온 영상 목록(영상ID, 제목, 썸네일)을 최근 업로드 순으로 가져온다."""
-    playlist_id = get_uploads_playlist_id(youtube)
+def _list_videos_in_playlist(youtube, playlist_id: str, max_total: int = 200) -> list[dict]:
     videos: list[dict] = []
     page_token: Optional[str] = None
 
@@ -64,6 +95,23 @@ def list_my_videos(youtube, max_total: int = 200) -> list[dict]:
             break
 
     return videos
+
+
+def list_my_videos(youtube, max_total: int = 200) -> list[dict]:
+    """내 채널에 올라온 영상 목록(영상ID, 제목, 썸네일)을 최근 업로드 순으로 가져온다."""
+    playlist_id = get_uploads_playlist_id(youtube)
+    return _list_videos_in_playlist(youtube, playlist_id, max_total)
+
+
+def list_videos_by_handle(youtube, handle: str, max_total: int = 200) -> tuple[str, list[dict]]:
+    """@핸들로 지정한 채널의 영상 목록을 가져온다. mine=True가 엉뚱한 채널로 붙는 문제의
+    우회책(2026-09) — 반환값은 (채널 이름, 영상 목록). 공개된 영상만 나온다(비공개·미등록
+    영상은 채널 소유자 권한으로 봐도 이 방식으로는 안 보일 수 있음 — 그럴 땐 영상 링크를
+    직접 추가하는 기능을 쓴다)."""
+    channel = get_channel_id_by_handle(youtube, handle)
+    playlist_id = channel["contentDetails"]["relatedPlaylists"]["uploads"]
+    channel_title = channel["snippet"]["title"]
+    return channel_title, _list_videos_in_playlist(youtube, playlist_id, max_total)
 
 
 def get_video_full_details(youtube, video_id: str) -> dict:

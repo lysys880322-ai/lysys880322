@@ -226,6 +226,65 @@ with st.container(border=True):
     if "last_fetch_msg" in st.session_state:
         st.write(st.session_state.last_fetch_msg)
 
+    # "mine=True"가 로그인 계정과 무관하게 엉뚱한(빈) 채널로 붙어버리는 문제(2026-09)의
+    # 우회책 — @핸들로 채널을 직접 지정해서 찾으면 로그인 세션이 어느 채널로 인증됐는지와
+    # 상관없이 항상 그 핸들이 가리키는 정확한 채널을 찾는다. 다만 "공개"된 영상만 나온다 —
+    # 아직 비공개(미공개)로 저장된 영상은 아래 "영상 링크 직접 추가"를 대신 쓴다.
+    with st.expander("🔎 채널 핸들로 다시 찾기 (위 자동 불러오기가 엉뚱한 채널을 찾을 때)"):
+        st.caption(
+            "위 '영상 목록 불러오기'가 로그인 계정과 다른(엉뚱한) 채널을 찾아올 때 쓰는 우회 기능입니다. "
+            "채널 핸들(예: @비트한량)을 입력하면 그 채널의 공개된 영상만 가져옵니다. "
+            "아직 비공개로 저장된 영상은 여기 안 뜨니, 그럴 땐 아래 '영상 링크 직접 추가'를 쓰세요."
+        )
+        handle_input = st.text_input("채널 핸들 (예: @비트한량)", key="channel_handle_input")
+        if st.button("이 채널에서 다시 찾기", key="channel_handle_fetch"):
+            handle = handle_input.strip()
+            if not handle:
+                st.error("채널 핸들을 입력해주세요. (유튜브 채널 페이지 URL의 @뒤에 붙은 이름이에요)")
+            else:
+                with st.spinner(f"'{handle}' 채널 영상을 불러오는 중..."):
+                    try:
+                        ch_title, found = youtube_api.list_videos_by_handle(youtube, handle)
+                        existing_ids = {v["video_id"] for v in st.session_state.videos}
+                        added = [v for v in found if v["video_id"] not in existing_ids]
+                        st.session_state.videos.extend(added)
+                        st.success(f"✅ 채널 \"{ch_title}\"에서 영상 {len(found)}개를 찾았습니다(새로 추가됨: {len(added)}개).")
+                    except Exception as e:  # noqa: BLE001
+                        st.error(f"채널을 찾지 못했습니다: {e}")
+
+    # 구글 계정이 "mine=True"로 엉뚱한(빈) 채널에 붙어서 자동 목록이 계속 0개로 나오는
+    # 문제(2026-09)의 우회 기능 — 채널 목록 자동 탐색과 무관하게, 영상 링크/ID만 있으면
+    # (그 영상에 대한 편집 권한이 있는 계정으로 로그인한 상태라면) 바로 추가해서 작업할 수 있다.
+    with st.expander("➕ 영상 링크·ID 직접 추가 (채널 목록이 안 뜰 때 우회용)"):
+        st.caption(
+            "위 '영상 목록 불러오기'가 계속 0개로 나올 때 쓰는 우회 기능입니다. "
+            "유튜브 영상 링크(https://youtu.be/... 등)나 영상 ID(11자리)를 붙여넣으면, "
+            "그 영상에 대한 편집 권한이 있는 계정으로 로그인돼 있는 한 바로 추가됩니다."
+        )
+        manual_input = st.text_input("영상 링크 또는 영상 ID", key="manual_video_input")
+        if st.button("이 영상 추가하기", key="manual_video_add"):
+            vid = youtube_api.extract_video_id(manual_input)
+            if not vid:
+                st.error("영상 ID를 알아볼 수 없습니다. 링크 전체를 그대로 붙여넣거나, 11자리 영상 ID를 확인해주세요.")
+            else:
+                try:
+                    resp = youtube.videos().list(part="snippet", id=vid).execute()
+                    items = resp.get("items", [])
+                    if not items:
+                        st.error("이 영상을 찾을 수 없습니다. 영상 ID가 맞는지, 지금 로그인한 계정이 이 영상을 편집할 권한이 있는지 확인해주세요.")
+                    else:
+                        snippet = items[0]["snippet"]
+                        new_video = {
+                            "video_id": vid,
+                            "title": snippet.get("title", ""),
+                            "thumbnail": (snippet.get("thumbnails", {}).get("default") or {}).get("url", ""),
+                        }
+                        if not any(v["video_id"] == vid for v in st.session_state.videos):
+                            st.session_state.videos.append(new_video)
+                        st.success(f"✅ \"{new_video['title']}\" 추가했습니다. 아래 표에서 선택해주세요.")
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"영상 정보를 가져오지 못했습니다: {e}")
+
     if not st.session_state.videos:
         st.info("위 '영상 목록 불러오기' 버튼을 눌러주세요.")
         st.stop()
