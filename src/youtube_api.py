@@ -114,6 +114,20 @@ def list_videos_by_handle(youtube, handle: str, max_total: int = 200) -> tuple[s
     return channel_title, _list_videos_in_playlist(youtube, playlist_id, max_total)
 
 
+def get_existing_localization_summary(youtube, video_ids: list[str]) -> dict[str, list[str]]:
+    """영상ID 목록에 대해 이미 등록된 다국어 번역(localizations) 언어 코드 목록을 한 번에
+    가져온다("이미 번역 올린 영상인지 목록에서 바로 구분하고 싶다, 안 그러면 또 다 해야
+    하나 헷갈린다"는 요청, 2026-10). videos.list는 id를 쉼표로 여러 개 넣으면 한 번의
+    호출로 최대 50개까지 조회되므로, 영상 개수만큼 따로 호출하지 않고 쿼터를 아낀다."""
+    summary: dict[str, list[str]] = {}
+    for i in range(0, len(video_ids), 50):
+        batch = video_ids[i : i + 50]
+        resp = youtube.videos().list(part="localizations", id=",".join(batch)).execute()
+        for item in resp.get("items", []):
+            summary[item["id"]] = list((item.get("localizations") or {}).keys())
+    return summary
+
+
 def get_video_full_details(youtube, video_id: str) -> dict:
     """지금 시점의 snippet 전체와 기존 localizations 전체를 그대로 가져온다.
     이후 업데이트 시 이 값을 기반으로 병합해야 기존 정보가 안전하게 보존된다."""

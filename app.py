@@ -156,6 +156,23 @@ if "video_details_cache" not in st.session_state:
     st.session_state.video_details_cache = {}  # video_id -> {snippet, localizations}
 if "results" not in st.session_state:
     st.session_state.results = []
+if "video_lang_summary" not in st.session_state:
+    st.session_state.video_lang_summary = {}  # video_id -> 이미 등록된 언어 코드 목록
+
+
+def _refresh_lang_summary(video_ids: list[str]) -> None:
+    """"번역 올렸던 영상인지 목록에서 바로 구분되게 해달라"는 요청(2026-10) — 영상 목록을
+    새로 불러오거나 추가할 때마다, 각 영상에 이미 등록된 다국어 번역 언어를 한 번에 조회해서
+    video_lang_summary에 채워둔다. 번역 실행(4단계)과는 별개로, 여기선 조회만 하고 실제
+    번역·등록은 하지 않는다."""
+    if not video_ids:
+        return
+    try:
+        fetched = youtube_api.get_existing_localization_summary(get_client(), video_ids)
+        st.session_state.video_lang_summary.update(fetched)
+    except Exception:  # noqa: BLE001
+        # 조회 실패해도 번역 상태 표시만 "확인 안 됨"으로 남을 뿐 — 다른 기능엔 지장 없게 조용히 넘어간다.
+        pass
 
 
 def get_client():
@@ -210,6 +227,7 @@ with st.container(border=True):
                 try:
                     channel_info = youtube.channels().list(part="snippet,contentDetails", mine=True).execute()
                     st.session_state.videos = youtube_api.list_my_videos(youtube)
+                    _refresh_lang_summary([v["video_id"] for v in st.session_state.videos])
                     items = channel_info.get("items", [])
                     if items:
                         ch_title = items[0]["snippet"]["title"]
@@ -248,6 +266,7 @@ with st.container(border=True):
                         existing_ids = {v["video_id"] for v in st.session_state.videos}
                         added = [v for v in found if v["video_id"] not in existing_ids]
                         st.session_state.videos.extend(added)
+                        _refresh_lang_summary([v["video_id"] for v in added])
                         st.success(f"✅ 채널 \"{ch_title}\"에서 영상 {len(found)}개를 찾았습니다(새로 추가됨: {len(added)}개).")
                     except Exception as e:  # noqa: BLE001
                         st.error(f"채널을 찾지 못했습니다: {e}")
@@ -281,6 +300,7 @@ with st.container(border=True):
                         }
                         if not any(v["video_id"] == vid for v in st.session_state.videos):
                             st.session_state.videos.append(new_video)
+                        _refresh_lang_summary([vid])
                         st.success(f"✅ \"{new_video['title']}\" 추가했습니다. 아래 표에서 선택해주세요.")
                 except Exception as e:  # noqa: BLE001
                     st.error(f"영상 정보를 가져오지 못했습니다: {e}")
@@ -289,13 +309,26 @@ with st.container(border=True):
         st.info("위 '영상 목록 불러오기' 버튼을 눌러주세요.")
         st.stop()
 
+    # "다국어 번역 이미 올린 영상인지 목록에서 바로 구분되게 해달라, 안 그러면 기억 안 나면
+    # 또 다 해야 한다"는 요청(2026-10) — video_lang_summary(위 _refresh_lang_summary로
+    # 채움)를 읽어 번역 상태 열을 보여준다. 아직 조회가 안 된 영상은 "❓ 확인 안 됨".
+    def _translation_status(vid: str) -> str:
+        langs = st.session_state.video_lang_summary.get(vid)
+        if langs is None:
+            return "❓ 확인 안 됨"
+        if not langs:
+            return "❌ 없음"
+        return f"✅ {len(langs)}개 ({', '.join(sorted(langs))})"
+
     video_df = pd.DataFrame(st.session_state.videos)
     video_df.insert(0, "선택", False)
+    video_df["번역 상태"] = video_df["video_id"].map(_translation_status)
     edited_video_df = st.data_editor(
-        video_df[["선택", "title", "video_id"]],
+        video_df[["선택", "title", "번역 상태", "video_id"]],
         column_config={
             "선택": st.column_config.CheckboxColumn("선택"),
             "title": st.column_config.TextColumn("제목", disabled=True),
+            "번역 상태": st.column_config.TextColumn("번역 상태", disabled=True),
             "video_id": st.column_config.TextColumn("영상 ID", disabled=True),
         },
         hide_index=True,
