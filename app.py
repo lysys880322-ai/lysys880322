@@ -130,8 +130,12 @@ def section_header(number: str, title: str) -> None:
 # 내 PC에서 그냥 실행할 땐 이 값이 비어있어서 아래 블록 전체를 건너뛴다.
 if ACCESS_PASSWORD and not st.session_state.get("password_ok"):
     st.title("🔒 접속 비밀번호")
-    pw = st.text_input("비밀번호를 입력하세요", type="password")
-    if st.button("확인"):
+    # st.form으로 감싸면 입력창에서 엔터를 눌러도 "확인" 버튼을 누른 것과 동일하게 제출된다
+    # (form 밖의 text_input은 엔터가 그냥 값만 반영하고 버튼 클릭 전까진 아무 동작도 안 한다).
+    with st.form("password_gate"):
+        pw = st.text_input("비밀번호를 입력하세요", type="password")
+        submitted = st.form_submit_button("확인")
+    if submitted:
         if pw == ACCESS_PASSWORD:
             st.session_state["password_ok"] = True
             st.rerun()
