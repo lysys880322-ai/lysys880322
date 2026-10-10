@@ -60,6 +60,7 @@ TARGET_LANGUAGES = [
     ("ar", "아랍어", "Arabic"),
     ("pl", "폴란드어", "Polish"),
     ("nl", "네덜란드어", "Dutch"),
+    ("zh-TW", "대만어", "Traditional Chinese (Taiwan)"),
 ]
 
 LANGUAGE_NAME_BY_CODE = {code: name_ko for code, name_ko, _ in TARGET_LANGUAGES}
