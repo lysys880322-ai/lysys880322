@@ -19,7 +19,10 @@ def _get_client() -> genai.Client:
     if _client is None:
         if not GEMINI_API_KEY:
             raise RuntimeError(".env에 GEMINI_API_KEY가 설정되어 있지 않습니다.")
-        _client = genai.Client(api_key=GEMINI_API_KEY)
+        # "gemini-flash-latest" 같은 "-latest" 별칭 모델명은 API v1에서는 지원이 안 되고
+        # v1beta에서만 된다(2026-11, 404 NOT_FOUND 원인 확인). SDK 기본값이 v1이라
+        # api_version을 v1beta로 명시해줘야 한다.
+        _client = genai.Client(api_key=GEMINI_API_KEY, http_options=types.HttpOptions(api_version="v1beta"))
     return _client
 
 

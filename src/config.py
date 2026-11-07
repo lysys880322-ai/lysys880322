@@ -26,8 +26,9 @@ def _get(key: str, default: str = "") -> str:
 
 GOOGLE_CLIENT_SECRETS_FILE = _get("GOOGLE_CLIENT_SECRETS_FILE", "client_secret.json")
 GEMINI_API_KEY = _get("GEMINI_API_KEY", "")
-# "gemini-flash-latest"는 별칭 모델명이라 API v1에서 404(NOT_FOUND)가 났다(2026-11) — 실제
-# 존재하는 모델 ID로 고정해서 쓴다.
+# 404(NOT_FOUND) 원인은 모델명이 아니라 API 버전이었다(2026-11, translator.py의
+# _get_client에서 v1beta로 고정해서 해결) — 실존하는 구체적 모델 ID라 그대로 둬도 되고,
+# Secrets에 GEMINI_MODEL="gemini-flash-latest"로 되돌려놔도 이제는 정상 동작한다.
 GEMINI_MODEL = _get("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ── 웹 배포(Streamlit Cloud 등) 전용 설정 — 내 PC에서 그냥 실행할 때는 전혀 안 쓰인다. ──
