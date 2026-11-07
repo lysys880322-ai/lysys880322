@@ -5,3 +5,8 @@ google-auth-oauthlib>=1.2
 google-genai>=1.0
 python-dotenv>=1.0
 pandas>=2.2
+# streamlit이 st.data_editor(영상 목록 표) 렌더링에 내부적으로 pyarrow를 쓰는데, 버전을 안 박아두면
+# 배포할 때마다 다른 버전이 깔릴 수 있다. 2026-09-28에 pyarrow 24.0.0으로 깔리면서
+# "malloc(): unsorted double linked list corrupted"로 서버 프로세스 자체가 죽는 문제가 있었고,
+# 그 전에 잘 돌아가던 25.0.1로 고정해서 재발을 막는다.
+pyarrow==25.0.1

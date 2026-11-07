@@ -130,8 +130,12 @@ def section_header(number: str, title: str) -> None:
 # 내 PC에서 그냥 실행할 땐 이 값이 비어있어서 아래 블록 전체를 건너뛴다.
 if ACCESS_PASSWORD and not st.session_state.get("password_ok"):
     st.title("🔒 접속 비밀번호")
-    pw = st.text_input("비밀번호를 입력하세요", type="password")
-    if st.button("확인"):
+    # st.form으로 감싸면 입력창에서 엔터를 눌러도 "확인" 버튼을 누른 것과 동일하게 제출된다
+    # (form 밖의 text_input은 엔터가 그냥 값만 반영하고 버튼 클릭 전까진 아무 동작도 안 한다).
+    with st.form("password_gate"):
+        pw = st.text_input("비밀번호를 입력하세요", type="password")
+        submitted = st.form_submit_button("확인")
+    if submitted:
         if pw == ACCESS_PASSWORD:
             st.session_state["password_ok"] = True
             st.rerun()
@@ -156,6 +160,23 @@ if "video_details_cache" not in st.session_state:
     st.session_state.video_details_cache = {}  # video_id -> {snippet, localizations}
 if "results" not in st.session_state:
     st.session_state.results = []
+if "video_lang_summary" not in st.session_state:
+    st.session_state.video_lang_summary = {}  # video_id -> 이미 등록된 언어 코드 목록
+
+
+def _refresh_lang_summary(video_ids: list[str]) -> None:
+    """"번역 올렸던 영상인지 목록에서 바로 구분되게 해달라"는 요청(2026-10) — 영상 목록을
+    새로 불러오거나 추가할 때마다, 각 영상에 이미 등록된 다국어 번역 언어를 한 번에 조회해서
+    video_lang_summary에 채워둔다. 번역 실행(4단계)과는 별개로, 여기선 조회만 하고 실제
+    번역·등록은 하지 않는다."""
+    if not video_ids:
+        return
+    try:
+        fetched = youtube_api.get_existing_localization_summary(get_client(), video_ids)
+        st.session_state.video_lang_summary.update(fetched)
+    except Exception:  # noqa: BLE001
+        # 조회 실패해도 번역 상태 표시만 "확인 안 됨"으로 남을 뿐 — 다른 기능엔 지장 없게 조용히 넘어간다.
+        pass
 
 
 def get_client():
@@ -207,19 +228,111 @@ with st.container(border=True):
     with col1:
         if st.button("영상 목록 불러오기 / 새로고침"):
             with st.spinner("내 채널 영상 목록을 불러오는 중..."):
-                st.session_state.videos = youtube_api.list_my_videos(youtube)
+                try:
+                    channel_info = youtube.channels().list(part="snippet,contentDetails", mine=True).execute()
+                    st.session_state.videos = youtube_api.list_my_videos(youtube)
+                    _refresh_lang_summary([v["video_id"] for v in st.session_state.videos])
+                    items = channel_info.get("items", [])
+                    if items:
+                        ch_title = items[0]["snippet"]["title"]
+                        st.session_state.last_fetch_msg = (
+                            f"✅ 채널 \"{ch_title}\"에서 영상 {len(st.session_state.videos)}개를 찾았습니다."
+                        )
+                    else:
+                        st.session_state.last_fetch_msg = "⚠️ 이 계정에 연결된 유튜브 채널 정보를 아예 못 찾았습니다."
+                except Exception as e:  # noqa: BLE001
+                    st.session_state.last_fetch_msg = f"❌ 영상 목록을 불러오다 오류가 났습니다: {e}"
+
+    # "버튼을 아직 안 눌렀을 때"와 "눌렀는데 0개 찾았을 때"가 화면에 똑같이 보여서 "반응이
+    # 없다"고 느껴진다는 문제(2026-09) — 몇 개를 찾았는지(0개 포함) 항상 명확히 보여준다.
+    if "last_fetch_msg" in st.session_state:
+        st.write(st.session_state.last_fetch_msg)
+
+    # "mine=True"가 로그인 계정과 무관하게 엉뚱한(빈) 채널로 붙어버리는 문제(2026-09)의
+    # 우회책 — @핸들로 채널을 직접 지정해서 찾으면 로그인 세션이 어느 채널로 인증됐는지와
+    # 상관없이 항상 그 핸들이 가리키는 정확한 채널을 찾는다. 다만 "공개"된 영상만 나온다 —
+    # 아직 비공개(미공개)로 저장된 영상은 아래 "영상 링크 직접 추가"를 대신 쓴다.
+    with st.expander("🔎 채널 핸들로 다시 찾기 (위 자동 불러오기가 엉뚱한 채널을 찾을 때)"):
+        st.caption(
+            "위 '영상 목록 불러오기'가 로그인 계정과 다른(엉뚱한) 채널을 찾아올 때 쓰는 우회 기능입니다. "
+            "채널 핸들(예: @비트한량)을 입력하면 그 채널의 공개된 영상만 가져옵니다. "
+            "아직 비공개로 저장된 영상은 여기 안 뜨니, 그럴 땐 아래 '영상 링크 직접 추가'를 쓰세요."
+        )
+        handle_input = st.text_input("채널 핸들 (예: @비트한량)", key="channel_handle_input")
+        if st.button("이 채널에서 다시 찾기", key="channel_handle_fetch"):
+            handle = handle_input.strip()
+            if not handle:
+                st.error("채널 핸들을 입력해주세요. (유튜브 채널 페이지 URL의 @뒤에 붙은 이름이에요)")
+            else:
+                with st.spinner(f"'{handle}' 채널 영상을 불러오는 중..."):
+                    try:
+                        ch_title, found = youtube_api.list_videos_by_handle(youtube, handle)
+                        existing_ids = {v["video_id"] for v in st.session_state.videos}
+                        added = [v for v in found if v["video_id"] not in existing_ids]
+                        st.session_state.videos.extend(added)
+                        _refresh_lang_summary([v["video_id"] for v in added])
+                        st.success(f"✅ 채널 \"{ch_title}\"에서 영상 {len(found)}개를 찾았습니다(새로 추가됨: {len(added)}개).")
+                    except Exception as e:  # noqa: BLE001
+                        st.error(f"채널을 찾지 못했습니다: {e}")
+
+    # 구글 계정이 "mine=True"로 엉뚱한(빈) 채널에 붙어서 자동 목록이 계속 0개로 나오는
+    # 문제(2026-09)의 우회 기능 — 채널 목록 자동 탐색과 무관하게, 영상 링크/ID만 있으면
+    # (그 영상에 대한 편집 권한이 있는 계정으로 로그인한 상태라면) 바로 추가해서 작업할 수 있다.
+    with st.expander("➕ 영상 링크·ID 직접 추가 (채널 목록이 안 뜰 때 우회용)"):
+        st.caption(
+            "위 '영상 목록 불러오기'가 계속 0개로 나올 때 쓰는 우회 기능입니다. "
+            "유튜브 영상 링크(https://youtu.be/... 등)나 영상 ID(11자리)를 붙여넣으면, "
+            "그 영상에 대한 편집 권한이 있는 계정으로 로그인돼 있는 한 바로 추가됩니다."
+        )
+        manual_input = st.text_input("영상 링크 또는 영상 ID", key="manual_video_input")
+        if st.button("이 영상 추가하기", key="manual_video_add"):
+            vid = youtube_api.extract_video_id(manual_input)
+            if not vid:
+                st.error("영상 ID를 알아볼 수 없습니다. 링크 전체를 그대로 붙여넣거나, 11자리 영상 ID를 확인해주세요.")
+            else:
+                try:
+                    resp = youtube.videos().list(part="snippet", id=vid).execute()
+                    items = resp.get("items", [])
+                    if not items:
+                        st.error("이 영상을 찾을 수 없습니다. 영상 ID가 맞는지, 지금 로그인한 계정이 이 영상을 편집할 권한이 있는지 확인해주세요.")
+                    else:
+                        snippet = items[0]["snippet"]
+                        new_video = {
+                            "video_id": vid,
+                            "title": snippet.get("title", ""),
+                            "thumbnail": (snippet.get("thumbnails", {}).get("default") or {}).get("url", ""),
+                        }
+                        if not any(v["video_id"] == vid for v in st.session_state.videos):
+                            st.session_state.videos.append(new_video)
+                        _refresh_lang_summary([vid])
+                        st.success(f"✅ \"{new_video['title']}\" 추가했습니다. 아래 표에서 선택해주세요.")
+                except Exception as e:  # noqa: BLE001
+                    st.error(f"영상 정보를 가져오지 못했습니다: {e}")
 
     if not st.session_state.videos:
         st.info("위 '영상 목록 불러오기' 버튼을 눌러주세요.")
         st.stop()
 
+    # "다국어 번역 이미 올린 영상인지 목록에서 바로 구분되게 해달라, 안 그러면 기억 안 나면
+    # 또 다 해야 한다"는 요청(2026-10) — video_lang_summary(위 _refresh_lang_summary로
+    # 채움)를 읽어 번역 상태 열을 보여준다. 아직 조회가 안 된 영상은 "❓ 확인 안 됨".
+    def _translation_status(vid: str) -> str:
+        langs = st.session_state.video_lang_summary.get(vid)
+        if langs is None:
+            return "❓ 확인 안 됨"
+        if not langs:
+            return "❌ 없음"
+        return f"✅ {len(langs)}개 ({', '.join(sorted(langs))})"
+
     video_df = pd.DataFrame(st.session_state.videos)
     video_df.insert(0, "선택", False)
+    video_df["번역 상태"] = video_df["video_id"].map(_translation_status)
     edited_video_df = st.data_editor(
-        video_df[["선택", "title", "video_id"]],
+        video_df[["선택", "title", "번역 상태", "video_id"]],
         column_config={
             "선택": st.column_config.CheckboxColumn("선택"),
             "title": st.column_config.TextColumn("제목", disabled=True),
+            "번역 상태": st.column_config.TextColumn("번역 상태", disabled=True),
             "video_id": st.column_config.TextColumn("영상 ID", disabled=True),
         },
         hide_index=True,
