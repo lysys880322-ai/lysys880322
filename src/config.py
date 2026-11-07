@@ -26,10 +26,9 @@ def _get(key: str, default: str = "") -> str:
 
 GOOGLE_CLIENT_SECRETS_FILE = _get("GOOGLE_CLIENT_SECRETS_FILE", "client_secret.json")
 GEMINI_API_KEY = _get("GEMINI_API_KEY", "")
-# 404(NOT_FOUND) 원인은 모델명이 아니라 API 버전이었다(2026-11, translator.py의
-# _get_client에서 v1beta로 고정해서 해결) — 실존하는 구체적 모델 ID라 그대로 둬도 되고,
-# Secrets에 GEMINI_MODEL="gemini-flash-latest"로 되돌려놔도 이제는 정상 동작한다.
-GEMINI_MODEL = _get("GEMINI_MODEL", "gemini-2.5-flash")
+# 1차 404는 API 버전(v1→v1beta) 문제였고, 그걸 고치자 "gemini-2.5-flash는 신규 사용자
+# 지원 종료, gemini-3.8-flash를 쓰라"는 구글 쪽 에러가 떴다(2026-11) — 최신 모델로 교체.
+GEMINI_MODEL = _get("GEMINI_MODEL", "gemini-3.8-flash")
 
 # ── 웹 배포(Streamlit Cloud 등) 전용 설정 — 내 PC에서 그냥 실행할 때는 전혀 안 쓰인다. ──
 # AUTH_MODE: "desktop"(기본값, 내 PC 전용 로그인) 또는 "web"(배포용 로그인)
