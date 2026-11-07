@@ -370,7 +370,18 @@ with st.container(border=True):
 with st.container(border=True):
     section_header("4", "번역 실행 및 검토")
 
-    if st.button("🌐 선택한 영상 번역하기", type="primary"):
+    # "이미 번역한 건데 또 눌러서 크레딧 날렸다"는 신고(2026-11) — 실행 중인 작업을 중간에
+    # 멈추는 건 스트림릿 구조상 안 되지만(한 번 돌기 시작하면 다음 클릭을 못 받음), 애초에
+    # 이미 번역 결과가 있는데 실수로 다시 누르는 걸 막아주면 같은 사고는 더 안 난다. 결과가
+    # 있을 때는 체크박스로 "그래도 다시 할래요"를 확인받고 나서야 버튼이 눌리게 한다.
+    rerun_ok = True
+    if st.session_state.translation_rows:
+        rerun_ok = st.checkbox(
+            "이미 번역 결과가 있어요. 그래도 다시 번역할게요 (크레딧이 또 소모돼요).",
+            key="confirm_retranslate",
+        )
+
+    if st.button("🌐 선택한 영상 번역하기", type="primary", disabled=not rerun_ok):
         rows = []
         progress = st.progress(0.0, text="번역 준비 중...")
         selected_ids = selected_videos["video_id"].tolist()
